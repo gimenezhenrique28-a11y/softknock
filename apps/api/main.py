@@ -9,7 +9,7 @@ from typing import Any
 import anthropic
 import httpx
 from pypdf import PdfReader
-from fastapi import FastAPI, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -64,7 +64,7 @@ async def onboard(
     name: str = Form(...),
     company_email: str = Form(...),
     company_name: str = Form(...),
-    cv: UploadFile = Form(...),
+    cv: UploadFile = File(...),
 ):
     data = await cv.read()
     cv_text = ""
