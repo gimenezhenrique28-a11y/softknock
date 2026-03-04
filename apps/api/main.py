@@ -8,7 +8,7 @@ from typing import Any
 
 import anthropic
 import httpx
-import pdfplumber
+from pypdf import PdfReader
 from fastapi import FastAPI, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -69,8 +69,8 @@ async def onboard(
     data = await cv.read()
     cv_text = ""
     try:
-        with pdfplumber.open(io.BytesIO(data)) as pdf:
-            cv_text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+        reader = PdfReader(io.BytesIO(data))
+        cv_text = "\n".join(page.extract_text() or "" for page in reader.pages)
     except Exception:
         cv_text = "(CV parse failed)"
 
