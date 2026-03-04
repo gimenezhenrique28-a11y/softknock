@@ -459,6 +459,30 @@
   30%           { transform: translateY(-5px); opacity: 1; }
 }
 
+/* ── Tool status ─────────────────────────────────── */
+.tool-status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-style: italic;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+}
+
+.tool-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  flex-shrink: 0;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.4; transform: scale(0.9); }
+  50%       { opacity: 1;   transform: scale(1.15); }
+}
+
 /* ── Empty state ────────────────────────────────── */
 .empty-state {
   display: flex;

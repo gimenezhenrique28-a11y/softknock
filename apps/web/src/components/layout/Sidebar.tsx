@@ -9,6 +9,7 @@ import {
   Settings,
   FileText,
   ChevronRight,
+  MessageSquare,
 } from 'lucide-react';
 
 interface NavItem {
@@ -19,6 +20,7 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
+  { icon: <MessageSquare size={15} />, label: 'Lead Research', id: 'chat' },
   { icon: <LayoutDashboard size={15} />, label: 'Dashboard', id: 'dashboard' },
   { icon: <Users size={15} />, label: 'Candidates', id: 'candidates', badge: 5 },
   { icon: <GitBranch size={15} />, label: 'Hiring Flows', id: 'flows', badge: 3 },

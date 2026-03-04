@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Send, Plus, MessageSquare, Sparkles } from 'lucide-react'
+import { Send, Plus, MessageSquare, Sparkles, MapPin } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface Message {
@@ -14,15 +14,6 @@ interface Session {
   title: string
   createdAt: Date
 }
-
-const MOCK_RESPONSES = [
-  "I've analyzed **TechCorp Inc.** — they're a Series B SaaS company (~450 employees). Key signals: recent EMEA expansion, 3 new engineering hires in the last 30 days, and their CTO posted about infrastructure scaling challenges. This suggests a buying window for developer tools. ICP score: **91/100**.",
-  "Found **14 matching leads** in your target segment. The highest-intent prospect is **Sarah Chen** at Dataflow Systems — she viewed your pricing page twice and compared enterprise tiers. I'd recommend reaching out within 48 hours before the intent signal cools.",
-  "I can enrich this lead with **LinkedIn signals**, **firmographic data**, **technographic stack**, and **intent signals** from 3rd-party sources. Based on their job postings and tech stack (`Salesforce`, `Segment`, `dbt`), they're actively scaling their data infrastructure.",
-  "Based on the company's recent **Series A announcement** ($15M from Sequoia), they're likely hiring aggressively and evaluating new tooling. Their stack includes Salesforce, Slack, and Notion — they value integrated SaaS solutions. I'd lead with ROI framing rather than feature comparison.",
-]
-
-let mockIdx = 0
 
 const INITIAL_SESSIONS: Session[] = [
   { id: '1', title: 'TechCorp lead analysis', createdAt: new Date(Date.now() - 86_400_000) },
@@ -39,7 +30,6 @@ function relativeTime(date: Date): string {
 }
 
 function renderContent(content: string) {
-  // Bold: **text**
   const parts = content.split(/(\*\*[^*]+\*\*|`[^`]+`)/)
   return parts.map((part, i) => {
     if (part.startsWith('**') && part.endsWith('**')) {
@@ -52,21 +42,25 @@ function renderContent(content: string) {
   })
 }
 
-export default function Chat() {
+interface ChatProps {
+  sessionId: string
+}
+
+export default function Chat({ sessionId }: ChatProps) {
   const [sessions, setSessions] = useState<Session[]>(INITIAL_SESSIONS)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [toolStatus, setToolStatus] = useState<string | null>(null)
 
   const bottomRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages, isLoading])
+  }, [messages, isLoading, toolStatus])
 
-  // Auto-resize textarea
   useEffect(() => {
     const el = textareaRef.current
     if (!el) return
@@ -74,7 +68,7 @@ export default function Chat() {
     el.style.height = `${Math.min(el.scrollHeight, 180)}px`
   }, [input])
 
-  const submit = useCallback(() => {
+  const submit = useCallback(async () => {
     const content = input.trim()
     if (!content || isLoading) return
 
@@ -84,24 +78,63 @@ export default function Chat() {
       content,
       timestamp: new Date(),
     }
-
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
+    setToolStatus(null)
 
-    // Simulate API latency
-    const delay = 900 + Math.random() * 700
-    setTimeout(() => {
-      const aiMsg: Message = {
-        id: crypto.randomUUID(),
-        role: 'assistant',
-        content: MOCK_RESPONSES[mockIdx++ % MOCK_RESPONSES.length],
-        timestamp: new Date(),
+    const aiId = crypto.randomUUID()
+    setMessages(prev => [...prev, { id: aiId, role: 'assistant', content: '', timestamp: new Date() }])
+
+    try {
+      const history = messages
+        .filter(m => m.content)
+        .slice(-20)
+        .map(m => ({ role: m.role, content: m.content }))
+
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session_id: sessionId, message: content, history }),
+      })
+
+      if (!res.ok || !res.body) throw new Error(await res.text())
+
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      let buf = ''
+
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        buf += decoder.decode(value, { stream: true })
+        const lines = buf.split('\n')
+        buf = lines.pop() ?? ''
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue
+          const event = JSON.parse(line.slice(6))
+          if (event.type === 'text') {
+            setMessages(prev =>
+              prev.map(m => (m.id === aiId ? { ...m, content: m.content + event.text } : m))
+            )
+          } else if (event.type === 'tool_start') {
+            setToolStatus('Searching Google Maps\u2026')
+          } else if (event.type === 'tool_result' || event.type === 'done') {
+            setToolStatus(null)
+          }
+        }
       }
-      setMessages(prev => [...prev, aiMsg])
+    } catch {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === aiId ? { ...m, content: 'Something went wrong. Please try again.' } : m
+        )
+      )
+    } finally {
       setIsLoading(false)
-    }, delay)
-  }, [input, isLoading])
+      setToolStatus(null)
+    }
+  }, [input, isLoading, messages, sessionId])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
@@ -131,7 +164,6 @@ export default function Chat() {
 
   return (
     <div className="chat-root">
-      {/* ── Sidebar ── */}
       <aside className="chat-sidebar">
         <div className="sidebar-brand">
           <div className="brand-mark">
@@ -166,7 +198,6 @@ export default function Chat() {
         </div>
       </aside>
 
-      {/* ── Main ── */}
       <main className="chat-main">
         <header className="chat-header">
           <div className="header-title">
@@ -178,7 +209,6 @@ export default function Chat() {
           </div>
         </header>
 
-        {/* Messages */}
         <div className="messages-container">
           {isEmpty ? (
             <div className="empty-state">
@@ -208,39 +238,37 @@ export default function Chat() {
           ) : (
             <div className="messages-list">
               {messages.map(msg => (
-                <div
-                  key={msg.id}
-                  className={cn('message-row', msg.role)}
-                >
+                <div key={msg.id} className={cn('message-row', msg.role)}>
                   {msg.role === 'assistant' && (
                     <div className="message-avatar ai">
                       <Sparkles size={11} />
                     </div>
                   )}
-
                   <div className={cn('message-bubble', msg.role)}>
                     <div className="message-content">
-                      {renderContent(msg.content)}
+                      {msg.content ? renderContent(msg.content) : (
+                        <div className="typing-indicator"><span /><span /><span /></div>
+                      )}
                     </div>
-                    <div className="message-time">{relativeTime(msg.timestamp)}</div>
+                    {msg.content && (
+                      <div className="message-time">{relativeTime(msg.timestamp)}</div>
+                    )}
                   </div>
-
                   {msg.role === 'user' && (
                     <div className="message-avatar user">U</div>
                   )}
                 </div>
               ))}
 
-              {isLoading && (
+              {toolStatus && (
                 <div className="message-row assistant">
                   <div className="message-avatar ai">
-                    <Sparkles size={11} />
+                    <MapPin size={11} />
                   </div>
                   <div className="message-bubble assistant">
-                    <div className="message-content" style={{ padding: '0.75rem 0.9375rem' }}>
-                      <div className="typing-indicator">
-                        <span /><span /><span />
-                      </div>
+                    <div className="message-content tool-status">
+                      <span className="tool-status-dot" />
+                      {toolStatus}
                     </div>
                   </div>
                 </div>
@@ -251,7 +279,6 @@ export default function Chat() {
           )}
         </div>
 
-        {/* Input */}
         <div className="input-area">
           <div className="input-container">
             <textarea
@@ -260,7 +287,7 @@ export default function Chat() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about a lead, company, or prospect…"
+              placeholder="Ask about a lead, company, or prospect\u2026"
               rows={1}
             />
             <button
@@ -272,7 +299,7 @@ export default function Chat() {
               <Send size={13} />
             </button>
           </div>
-          <div className="input-hint">⌘ Return to send</div>
+          <div className="input-hint">\u2318 Return to send</div>
         </div>
       </main>
     </div>
