@@ -137,7 +137,7 @@ export default function Chat() {
           <div className="brand-mark">
             <Sparkles size={13} />
           </div>
-          <span className="brand-name">Prospect</span>
+          <span className="brand-name">SoftKnock</span>
         </div>
 
         <div className="sidebar-body">

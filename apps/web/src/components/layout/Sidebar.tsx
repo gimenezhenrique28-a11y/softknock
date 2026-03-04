@@ -58,7 +58,7 @@ export function Sidebar({
           <div className="w-7 h-7 rounded-lg bg-primary flex items-center justify-center shrink-0">
             <Sparkles size={13} className="text-primary-foreground" />
           </div>
-          <span className="text-sm font-semibold text-sidebar-foreground tracking-tight">Outreach AI</span>
+          <span className="text-sm font-semibold text-sidebar-foreground tracking-tight">SoftKnock</span>
         </div>
       </div>
 
