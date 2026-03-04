@@ -11,11 +11,42 @@ import { useDashboard } from '@/hooks/useDashboard';
 import { useAgent } from '@/hooks/useAgent';
 import { currentUser } from '@/data/mockData';
 import { Users, GitBranch, Mail, TrendingUp, Plus, Inbox, Workflow } from 'lucide-react';
+import Onboarding from '@/components/Onboarding';
+import Chat from '@/components/Chat';
 
 export default function App() {
+  const [sessionId, setSessionId] = useState<string | null>(() => localStorage.getItem('sk_session'));
+
+  if (!sessionId) {
+    return <Onboarding onComplete={(sid) => setSessionId(sid)} />;
+  }
+
+  return <AppShell sessionId={sessionId} />;
+}
+
+function AppShell({ sessionId }: { sessionId: string }) {
   const { candidates, hiringFlows, activityItems, metrics, isLoading } = useDashboard();
   const agent = useAgent();
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState('chat');
+
+  if (currentPage === 'chat') {
+    return (
+      <div className="flex h-screen overflow-hidden bg-background">
+        <Sidebar
+          currentPage={currentPage}
+          onNavigate={setCurrentPage}
+          onOpenAgent={agent.toggleAgent}
+          isAgentOpen={agent.isOpen}
+          userName={currentUser.name}
+          userRole={currentUser.role}
+          userInitials={currentUser.initials}
+        />
+        <div className="flex-1 overflow-hidden min-w-0">
+          <Chat sessionId={sessionId} />
+        </div>
+      </div>
+    );
+  }
 
   const metricCards = [
     { label: 'Total Candidates', value: metrics.totalCandidates, change: metrics.candidatesChange, icon: <Users size={14} /> },
